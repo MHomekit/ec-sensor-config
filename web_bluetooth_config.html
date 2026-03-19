@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Sensor WiFi Configuration via Web Bluetooth</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            text-align: center;
+            padding: 30px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .form-group {
+            margin: 20px 0;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .device-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+        .instructions {
+            text-align: left;
+            background-color: #e8f4fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+        .step {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+        }
+        .step:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #007bff;
+            font-weight: bold;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EC Sensor WiFi Configuration via Web Bluetooth</h1>
+        
+        <div class="device-info">
+            <div id="deviceInfo">Device: Not connected</div>
+            <div id="serviceInfo">Service: Not connected</div>
+        </div>
+        
+        <div id="statusMessage" class="status"></div>
+        
+        <button id="connectButton" class="button">1. Connect to EC Sensor via Bluetooth</button>
+        
+        <div id="configForm" style="display: none;">
+            <h2>WiFi Configuration</h2>
+            
+            <div class="form-group">
+                <label for="wifiSsid">WiFi Network Name (SSID):</label>
+                <select id="wifiSsid">
+                    <option value="">Select WiFi network</option>
+                    <option value="manual">Enter manually</option>
+                </select>
+                <input type="text" id="manualSsid" placeholder="Enter WiFi SSID manually" style="display: none; margin-top: 10px;">
+            </div>
+            
+            <div class="form-group">
+                <label for="wifiPassword">WiFi Password:</label>
+                <input type="password" id="wifiPassword" placeholder="Enter WiFi password">
+            </div>
+            
+            <button id="scanWifiButton" class="button">Scan for WiFi Networks</button>
+            <button id="sendConfigButton" class="button">2. Send Configuration to Device</button>
+        </div>
+        
+        <button id="disconnectButton" class="button" style="display: none;">Disconnect Bluetooth</button>
+        
+        <div class="instructions">
+            <h2>How to Configure:</h2>
+            
+            <div class="step">
+                <strong>Step 1:</strong> Click "Connect to EC Sensor via Bluetooth" button
+            </div>
+            
+            <div class="step">
+                <strong>Step 2:</strong> Select your EC sensor device from the Bluetooth device list
+            </div>
+            
+            <div class="step">
+                <strong>Step 3:</strong> Select your WiFi network from the list or enter manually
+            </div>
+            
+            <div class="step">
+                <strong>Step 4:</strong> Enter your WiFi password
+            </div>
+            
+            <div class="step">
+                <strong>Step 5:</strong> Click "Send Configuration to Device" button
+            </div>
+            
+            <div class="step">
+                <strong>Step 6:</strong> The device will save the configuration and connect to your WiFi
+            </div>
+        </div>
+        
+        <div class="warning">
+            <h3>Browser Compatibility:</h3>
+            <p>Web Bluetooth API is supported in:</p>
+            <ul>
+                <li>Android Chrome 79+</li>
+                <li>Android Edge 79+</li>
+                <li>Chrome OS Chrome 79+</li>
+                <li>macOS Chrome 79+</li>
+                <li>Linux Chrome 79+</li>
+                <li>Windows Chrome 79+</li>
+            </ul>
+            <p><strong>Note:</strong> iOS Safari does not support Web Bluetooth API.</p>
+        </div>
+    </div>
+    
+    <script>
+        // BLE Service and Characteristic UUIDs (must match device firmware)
+        const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+        const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+        
+        // DOM Elements
+        const connectButton = document.getElementById('connectButton');
+        const disconnectButton = document.getElementById('disconnectButton');
+        const configForm = document.getElementById('configForm');
+        const wifiSsid = document.getElementById('wifiSsid');
+        const manualSsid = document.getElementById('manualSsid');
+        const wifiPassword = document.getElementById('wifiPassword');
+        const scanWifiButton = document.getElementById('scanWifiButton');
+        const sendConfigButton = document.getElementById('sendConfigButton');
+        const statusMessage = document.getElementById('statusMessage');
+        const deviceInfo = document.getElementById('deviceInfo');
+        const serviceInfo = document.getElementById('serviceInfo');
+        
+        // Bluetooth variables
+        let device = null;
+        let server = null;
+        let service = null;
+        let characteristic = null;
+        
+        // Show status message
+        function showStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.className = `status ${type}`;
+            statusMessage.style.display = 'block';
+            console.log(`${type}: ${message}`);
+        }
+        
+        // Clear status message
+        function clearStatus() {
+            statusMessage.style.display = 'none';
+        }
+        
+        // Check Web Bluetooth API support
+        if (!navigator.bluetooth) {
+            showStatus('Web Bluetooth API is not supported in this browser. Please use Chrome 79+ on Android or desktop.', 'error');
+            connectButton.disabled = true;
+        }
+        
+        // Connect to BLE device
+        connectButton.addEventListener('click', async () => {
+            try {
+                showStatus('Scanning for EC Sensor device...', 'info');
+                
+                // Request Bluetooth device
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { namePrefix: 'EC-Sensor-' }
+                    ],
+                    optionalServices: [SERVICE_UUID]
+                });
+                
+                // Update device info
+                deviceInfo.textContent = `Device: ${device.name}`;
+                
+                // Connect to GATT server
+                showStatus('Connecting to device...', 'info');
+                server = await device.gatt.connect();
+                
+                // Get service
+                showStatus('Getting service...', 'info');
+                service = await server.getPrimaryService(SERVICE_UUID);
+                serviceInfo.textContent = `Service: Connected`;
+                
+                // Get characteristic
+                showStatus('Getting characteristic...', 'info');
+                characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                
+                // Update UI
+                showStatus('Connected to EC Sensor via Bluetooth!', 'success');
+                connectButton.style.display = 'none';
+                disconnectButton.style.display = 'inline-block';
+                configForm.style.display = 'block';
+                
+                // Setup disconnect handler
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+                
+            } catch (error) {
+                showStatus(`Connection failed: ${error.message}`, 'error');
+                console.error('Bluetooth connection error:', error);
+            }
+        });
+        
+        // Handle disconnection
+        function onDisconnected() {
+            showStatus('Device disconnected', 'error');
+            deviceInfo.textContent = 'Device: Not connected';
+            serviceInfo.textContent = 'Service: Not connected';
+            connectButton.style.display = 'inline-block';
+            disconnectButton.style.display = 'none';
+            configForm.style.display = 'none';
+            device = null;
+            server = null;
+            service = null;
+            characteristic = null;
+        }
+        
+        // Manual disconnect
+        disconnectButton.addEventListener('click', () => {
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+            }
+            onDisconnected();
+        });
+        
+        // WiFi SSID selection change
+        wifiSsid.addEventListener('change', () => {
+            if (wifiSsid.value === 'manual') {
+                manualSsid.style.display = 'block';
+                manualSsid.focus();
+            } else {
+                manualSsid.style.display = 'none';
+            }
+        });
+        
+        // Scan for WiFi networks (placeholder - would need device support)
+        scanWifiButton.addEventListener('click', () => {
+            showStatus('WiFi scanning not implemented in this demo. Please select "Enter manually" and type your WiFi SSID.', 'info');
+            
+            // In a real implementation, this would send a command to the device
+            // to scan for WiFi networks and return the list
+        });
+        
+        // Send configuration to device
+        sendConfigButton.addEventListener('click', async () => {
+            // Get SSID value
+            let ssid = wifiSsid.value;
+            if (ssid === 'manual') {
+                ssid = manualSsid.value.trim();
+            }
+            
+            // Validate inputs
+            if (!ssid) {
+                showStatus('Please enter WiFi SSID', 'error');
+                return;
+            }
+            
+            const password = wifiPassword.value.trim();
+            if (!password) {
+                showStatus('Please enter WiFi password', 'error');
+                return;
+            }
+            
+            try {
+                // Create configuration string: "SSID:password"
+                const configString = `${ssid}:${password}`;
+                
+                showStatus('Sending configuration to device...', 'info');
+                
+                // Convert string to ArrayBuffer
+                const encoder = new TextEncoder();
+                const configData = encoder.encode(configString);
+                
+                // Write to characteristic
+                await characteristic.writeValue(configData);
+                
+                showStatus('Configuration sent successfully! The device will now attempt to connect to your WiFi network.', 'success');
+                
+                // Clear form
+                wifiSsid.value = '';
+                manualSsid.value = '';
+                wifiPassword.value = '';
+                manualSsid.style.display = 'none';
+                
+                // Disconnect after a delay
+                setTimeout(() => {
+                    if (device && device.gatt.connected) {
+                        device.gatt.disconnect();
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                showStatus(`Failed to send configuration: ${error.message}`, 'error');
+                console.error('Configuration send error:', error);
+            }
+        });
+        
+        // Initialize manual SSID input
+        manualSsid.style.display = 'none';
+        
+        // Load URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const deviceParam = urlParams.get('device');
+        if (deviceParam) {
+            deviceInfo.textContent = `Device: ${deviceParam}`;
+        }
+        
+        // Page load message
+        window.addEventListener('load', () => {
+            console.log('EC Sensor Web Bluetooth configuration page loaded');
+            showStatus('Ready to configure EC Sensor via Web Bluetooth', 'info');
+            setTimeout(clearStatus, 3000);
+        });
+    </script>
+</body>
+</html>
